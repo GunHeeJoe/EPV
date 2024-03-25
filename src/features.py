@@ -15,10 +15,6 @@ def extract_pass(df_event, df_track, method=1):
                     & (df_event["start_frame"] < df_event["end_frame"])
                 ].copy()
 
-
-    # only keep relevant columns
-    # df_pass = df_pass[["team", "start_frame", "end_frame", "eventName", "subEventName", "from", "to", "freeze_frame" ,"accurate", "pass_id"]].copy()
-
     # attach the ball position at the start and end frame
     df_ball = df_track[["frame", "ball_x", "ball_y", "episode"]].copy()
 
@@ -43,23 +39,31 @@ def extract_pass(df_event, df_track, method=1):
 # metrica data에서 선수들 위치 추출하는 데이터 프레임
 def extract_player_pos(df, frame):
    basic = df[df['frame'] == frame]
+   # x, y 칼럼만 뽑아내기
+   columns = []
+   c_player = []
+   for i in list(basic.columns):
+       if (i[3:5] == '_x') or (i[3:5] == '_y'):
+           columns.append(i)
+           c_player.append(i[0:3])
+   c_player = list(set(c_player))
+   basic = basic[columns]
 
    # player 전처리
    player_df = []
-   for i in range(1, 36):
-     if i < 10:
-       i_basic = [i]
-       i_basic += list(basic.filter(regex=f'0{i}').iloc[0])[0:2]
-       i_basic += ['Home']
-     else:
-       i_basic = [i]
-       i_basic += list(basic.filter(regex=f'{i}').iloc[0])[0:2]
-       if i <= 14 :
-         i_basic += ['Home']
+   for i in c_player:
+       i_basic = []
+       i_basic += [i]
+       i_basic += [basic.filter(regex=f'{i}_x').iloc[0][0], basic.filter(regex=f'{i}_y').iloc[0][0]]
+       if i[0] == 'A':
+          i_basic += ['Home']
        else:
-         i_basic += ['Away']
-     player_df.append(i_basic)
+          i_basic += ['Away']
+       player_df.append(i_basic)
    player_df = pd.DataFrame(player_df, columns=['playerId', 'xPos', 'yPos', 'team']).dropna(axis=0)
+   
+   # 마지막에 A/B로 sort 하고, 그 다음에 숫자로 sort
+   player_df = player_df.sort_values(by=['playerId'][0], axis = 0)
    
    return player_df
 
@@ -83,7 +87,7 @@ def intended_receiver(df_pass, df_track):
       )
 
       # 패스한 선수는 제거
-      passer_index = id_list.index(int(action['from'][1:]))
+      passer_index = id_list.index(action['from'])
       del id_list[passer_index]
       receiver_coo = np.delete(receiver_coo, passer_index, axis = 0)
 
